@@ -3,7 +3,6 @@ from google import genai
 import os
 from dotenv import load_dotenv
 import requests
-import data
 
 load_dotenv()
 
@@ -18,7 +17,7 @@ def index():
 
 @app.route("/analyze", methods=["POST"])
 def analyze():
-    prompt = data.PROMPT
+    prompt = "In json format, Tell me the calories of the food in the image? Assume everything was bought on October 21st, 2020, and was stored in the fridge. Give roughly how long it will last."
     image_url = request.form.get("image_url")
     image_file = request.files.get("image_file")
 
