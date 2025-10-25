@@ -2,172 +2,99 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Gemini Image Analyzer</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      margin: 2em;
-    }
-    form {
-      display: flex;
-      flex-direction: column;
-      gap: 1em;
-      max-width: 400px;
-    }
-    input, button, textarea {
-      padding: 0.5em;
-      font-size: 1em;
-    }
-    #result {
-      margin-top: 1em;
-      font-weight: bold;
-    }
-    #camera-container {
-      margin-top: 1em;
-    }
-    #video, #preview {
-      max-width: 400px;
-      width: 100%;
-      border: 1px solid #ccc;
-      display: block;
-    }
-    #video.hidden, #preview.hidden {
-      display: none;
-    }
-    .camera-controls {
-      display: flex;
-      gap: 0.5em;
-      margin-top: 0.5em;
-    }
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🍔 FoodGie - Gemini Vision</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-  <h1>📸 Gemini Image Analyzer</h1>
-  <form id="analyze-form" enctype="multipart/form-data">
-  
-    <label>Upload an image:</label>
-    <input type="file" name="image_file" accept="image/*" />
+  <div class="container">
+    <header>
+      <h1>🍔 FoodGie</h1>
+      <p class="subtitle">Analyze calories and freshness with AI</p>
+    </header>
 
-    <label>Or enter an image URL:</label>
-    <input type="text" name="image_url" placeholder="https://example.com/image.jpg" />
+    <main>
+      <div class="card">
+        <form id="analyze-form" enctype="multipart/form-data">
+          
+          <!-- File Upload Section -->
+          <div class="input-group">
+            <label class="label">
+              <span class="label-icon">📁</span>
+              Upload an image
+            </label>
+            <div class="file-input-wrapper">
+              <input type="file" name="image_file" id="image_file" accept="image/*" class="file-input" />
+              <label for="image_file" class="file-input-label">
+                <span class="file-input-text">Choose file...</span>
+              </label>
+            </div>
+          </div>
 
-    <label>Or take a photo:</label>
-    <div id="camera-container">
-      <video id="video" autoplay class="hidden"></video>
-      <img id="preview" alt="Captured photo" class="hidden" />
-      <div class="camera-controls">
-        <button type="button" id="start-camera">Start Camera</button>
-        <button type="button" id="capture" class="hidden">Capture Photo</button>
-        <button type="button" id="retake" class="hidden">Retake Photo</button>
+          <div class="divider">
+            <span>OR</span>
+          </div>
+
+          <!-- URL Input Section -->
+          <div class="input-group">
+            <label class="label">
+              <span class="label-icon">🔗</span>
+              Enter an image URL
+            </label>
+            <input 
+              type="text" 
+              name="image_url" 
+              placeholder="https://example.com/food-image.jpg" 
+              class="text-input"
+            />
+          </div>
+
+          <div class="divider">
+            <span>OR</span>
+          </div>
+
+          <!-- Camera Section -->
+          <div class="input-group">
+            <label class="label">
+              <span class="label-icon">📸</span>
+              Take a photo
+            </label>
+            <div id="camera-container">
+              <div class="camera-preview">
+                <video id="video" autoplay class="hidden"></video>
+                <img id="preview" alt="Captured photo" class="hidden" />
+              </div>
+              <div class="camera-controls">
+                <button type="button" id="start-camera" class="btn btn-secondary">
+                  <span>📷</span> Start Camera
+                </button>
+                <button type="button" id="capture" class="btn btn-secondary hidden">
+                  <span>📸</span> Capture Photo
+                </button>
+                <button type="button" id="retake" class="btn btn-secondary hidden">
+                  <span>🔄</span> Retake Photo
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Submit Button -->
+          <button type="submit" class="btn btn-primary">
+            <span>✨</span> Analyze Food
+          </button>
+        </form>
+
+        <!-- Results Section -->
+        <div id="result" class="result"></div>
       </div>
-    </div>
+    </main>
 
-    <button type="submit">Analyze</button>
-  </form>
+    <footer>
+      <p>Powered by Gemini 2.0 Flash</p>
+    </footer>
+  </div>
 
-  <div id="result"></div>
-
-  <script>
-    const form = document.getElementById("analyze-form");
-    const resultDiv = document.getElementById("result");
-    const video = document.getElementById("video");
-    const preview = document.getElementById("preview");
-    const startCameraBtn = document.getElementById("start-camera");
-    const captureBtn = document.getElementById("capture");
-    const retakeBtn = document.getElementById("retake");
-    
-    let stream = null;
-    let capturedBlob = null;
-
-    // Start camera
-    startCameraBtn.addEventListener("click", async () => {
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        video.srcObject = stream;
-        video.classList.remove("hidden");
-        preview.classList.add("hidden");
-        startCameraBtn.classList.add("hidden");
-        captureBtn.classList.remove("hidden");
-        retakeBtn.classList.add("hidden");
-      } catch (err) {
-        alert("Could not access camera: " + err.message);
-      }
-    });
-
-    // Capture photo
-    captureBtn.addEventListener("click", () => {
-      const canvas = document.createElement("canvas");
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext("2d");
-      ctx.drawImage(video, 0, 0);
-      
-      // Convert canvas to blob and show preview
-      canvas.toBlob((blob) => {
-        capturedBlob = blob;
-        const imageUrl = URL.createObjectURL(blob);
-        preview.src = imageUrl;
-        
-        // Stop and hide video, show preview
-        if (stream) {
-          stream.getTracks().forEach(track => track.stop());
-        }
-        video.pause();
-        video.srcObject = null;
-        video.classList.add("hidden");
-        preview.classList.remove("hidden");
-        
-        captureBtn.classList.add("hidden");
-        retakeBtn.classList.remove("hidden");
-        resultDiv.innerHTML = "✅ Photo captured! Click 'Analyze' to process.";
-      }, "image/jpeg", 0.9);
-    });
-
-    // Retake photo
-    retakeBtn.addEventListener("click", async () => {
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        video.srcObject = stream;
-        video.play();
-        video.classList.remove("hidden");
-        preview.classList.add("hidden");
-        capturedBlob = null;
-        retakeBtn.classList.add("hidden");
-        captureBtn.classList.remove("hidden");
-        resultDiv.innerHTML = "";
-      } catch (err) {
-        alert("Could not access camera: " + err.message);
-      }
-    });
-
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-
-      const formData = new FormData();
-      
-      // Priority: captured photo > uploaded file > URL
-      if (capturedBlob) {
-        formData.append("image_file", capturedBlob, "camera-capture.jpg");
-      } else if (form.elements.image_file.files[0]) {
-        formData.append("image_file", form.elements.image_file.files[0]);
-      } else if (form.elements.image_url.value) {
-        formData.append("image_url", form.elements.image_url.value);
-      }
-
-      resultDiv.innerHTML = "⏳ Analyzing image...";
-
-      const res = await fetch("/analyze", {
-        method: "POST",
-        body: formData
-      });
-
-      const data = await res.json();
-      if (data.response) {
-        resultDiv.innerHTML = `<p>💬 <b>Gemini says:</b> ${data.response}</p>`;
-      } else {
-        resultDiv.innerHTML = `<p style="color:red;">Error: ${data.error || 'Something went wrong'}</p>`;
-      }
-    });
-  </script>
+  <script src="{{ url_for('static', filename='js/camera.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/analyzer.js') }}"></script>
 </body>
 </html>
