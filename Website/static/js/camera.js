@@ -10,6 +10,9 @@ class CameraController {
     this.stream = null;
     this.capturedBlob = null;
     
+    // Detect iOS
+    this.isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    
     this.initEventListeners();
   }
 
@@ -21,22 +24,39 @@ class CameraController {
 
   async startCamera() {
     try {
-      // Request camera with higher resolution for better quality
-      this.stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { 
+      // iOS-specific constraints
+      const constraints = {
+        video: {
           facingMode: "environment", // Prefer back camera on mobile
-          width: { ideal: 1920 },
-          height: { ideal: 1080 }
-        }
-      });
+          width: { ideal: this.isIOS ? 1280 : 1920 },
+          height: { ideal: this.isIOS ? 720 : 1080 }
+        },
+        audio: false
+      };
+      
+      this.stream = await navigator.mediaDevices.getUserMedia(constraints);
       
       this.video.srcObject = this.stream;
+      
+      // iOS requires explicit play() call
+      if (this.isIOS) {
+        this.video.setAttribute('playsinline', 'true');
+        this.video.setAttribute('muted', 'true');
+      }
       
       // Wait for video to be ready before showing
       await new Promise((resolve) => {
         this.video.onloadedmetadata = () => {
-          this.video.play();
-          resolve();
+          this.video.play().then(() => {
+            console.log("Video playing");
+            resolve();
+          }).catch(err => {
+            console.error("Play error:", err);
+            // iOS sometimes needs a second attempt
+            setTimeout(() => {
+              this.video.play().then(resolve).catch(resolve);
+            }, 100);
+          });
         };
       });
       
@@ -49,7 +69,18 @@ class CameraController {
       console.log("Camera started successfully");
     } catch (err) {
       console.error("Camera error:", err);
-      alert("Could not access camera: " + err.message);
+      let errorMessage = "Could not access camera: " + err.message;
+      
+      // Provide helpful iOS-specific error messages
+      if (this.isIOS && err.name === 'NotAllowedError') {
+        errorMessage = "Camera access denied. Please go to Settings > Safari > Camera and allow access.";
+      } else if (err.name === 'NotFoundError') {
+        errorMessage = "No camera found on this device.";
+      } else if (err.name === 'NotReadableError') {
+        errorMessage = "Camera is already in use by another application.";
+      }
+      
+      alert(errorMessage);
     }
   }
 
@@ -60,7 +91,17 @@ class CameraController {
     const ctx = canvas.getContext("2d");
     ctx.drawImage(this.video, 0, 0);
     
+    // iOS Safari supports webp better, but JPEG is more universal
+    const imageFormat = this.isIOS ? "image/jpeg" : "image/jpeg";
+    const quality = 0.92;
+    
     canvas.toBlob((blob) => {
+      if (!blob) {
+        console.error("Failed to create blob");
+        alert("Failed to capture photo. Please try again.");
+        return;
+      }
+      
       this.capturedBlob = blob;
       const imageUrl = URL.createObjectURL(blob);
       this.preview.src = imageUrl;
@@ -79,7 +120,7 @@ class CameraController {
       }));
       
       console.log("Photo captured:", blob.size, "bytes");
-    }, "image/jpeg", 0.9);
+    }, imageFormat, quality);
   }
 
   async retakePhoto() {
