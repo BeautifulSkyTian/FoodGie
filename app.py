@@ -15,7 +15,7 @@ def index():
 
 @app.route("/analyze", methods=["POST"])
 def analyze():
-    prompt = request.form.get("prompt", "Describe this image in plain english and do not give me JSON format.")
+    prompt = "Tell me the calories of the food in the image?"
     image_url = request.form.get("image_url")
     image_file = request.files.get("image_file")
 
