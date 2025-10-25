@@ -26,21 +26,27 @@ def analyze():
     prompt = """In python dictionary format, give me the following info for each food item in the image: name, type (e.g. protein/fruit/vegetable),
     quantity(number if possible, or weight. Return this as an integer, even weight),
     expected_expiry_date (assume the date is bought on the day, and the item is put in a fridge).
-    and calories. Format: {
+    ,calories, carbs, fats, protein (all these as integers). Format: {
             "inventory": [
                 {
                     "name": "orange",
                     "type": "fruit",
                     "quantity": 6,
                     "expected_expiry_date": "18/11/2025",
-                    "calories": 62
+                    "calories": 62,
+                    "carbs": 0,
+                    "fats": 0,
+                    "protein": 0
                 },
                 { # GROUND BEEF BATCH 2 (Later Expiry, New Quantity)
                     "name": "ground beef",
                     "type": "protein",
-                    "quantity": 500.0,
+                    "quantity": 500,
                     "expected_expiry_date": "20/11/2025",
-                    "calories": 1250
+                    "calories": 1250,
+                    "carbs": 0,
+                    "fats": 150,
+                    "protein": 70
                 }
             ]
         }"""
