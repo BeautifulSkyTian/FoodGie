@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Gemini Image Analyzer</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 2em;
+    }
+    form {
+      display: flex;
+      flex-direction: column;
+      gap: 1em;
+      max-width: 400px;
+    }
+    input, button, textarea {
+      padding: 0.5em;
+      font-size: 1em;
+    }
+    #result {
+      margin-top: 1em;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔍 Gemini Image Analyzer</h1>
+  <form id="analyze-form" enctype="multipart/form-data">
+    <label>Prompt:</label>
+    <input type="text" name="prompt" placeholder="Describe this image" />
+
+    <label>Upload an image:</label>
+    <input type="file" name="image_file" accept="image/*" />
+
+    <label>Or enter an image URL:</label>
+    <input type="text" name="image_url" placeholder="https://example.com/image.jpg" />
+
+    <button type="submit">Analyze</button>
+  </form>
+
+  <div id="result"></div>
+
+  <script>
+    const form = document.getElementById("analyze-form");
+    const resultDiv = document.getElementById("result");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const formData = new FormData(form);
+      resultDiv.innerHTML = "⏳ Analyzing image...";
+
+      const res = await fetch("/analyze", {
+        method: "POST",
+        body: formData
+      });
+
+      const data = await res.json();
+      if (data.response) {
+        resultDiv.innerHTML = `<p>💬 <b>Gemini says:</b> ${data.response}</p>`;
+      } else {
+        resultDiv.innerHTML = `<p style="color:red;">Error: ${data.error || 'Something went wrong'}</p>`;
+      }
+    });
+  </script>
+</body>
+</html>
