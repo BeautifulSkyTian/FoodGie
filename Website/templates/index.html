@@ -22,10 +22,27 @@
       margin-top: 1em;
       font-weight: bold;
     }
+    #camera-container {
+      margin-top: 1em;
+    }
+    #video, #preview {
+      max-width: 400px;
+      width: 100%;
+      border: 1px solid #ccc;
+      display: block;
+    }
+    #video.hidden, #preview.hidden {
+      display: none;
+    }
+    .camera-controls {
+      display: flex;
+      gap: 0.5em;
+      margin-top: 0.5em;
+    }
   </style>
 </head>
 <body>
-  <h1>🔍 Gemini Image Analyzer</h1>
+  <h1>📸 Gemini Image Analyzer</h1>
   <form id="analyze-form" enctype="multipart/form-data">
   
     <label>Upload an image:</label>
@@ -33,6 +50,17 @@
 
     <label>Or enter an image URL:</label>
     <input type="text" name="image_url" placeholder="https://example.com/image.jpg" />
+
+    <label>Or take a photo:</label>
+    <div id="camera-container">
+      <video id="video" autoplay class="hidden"></video>
+      <img id="preview" alt="Captured photo" class="hidden" />
+      <div class="camera-controls">
+        <button type="button" id="start-camera">Start Camera</button>
+        <button type="button" id="capture" class="hidden">Capture Photo</button>
+        <button type="button" id="retake" class="hidden">Retake Photo</button>
+      </div>
+    </div>
 
     <button type="submit">Analyze</button>
   </form>
@@ -42,11 +70,90 @@
   <script>
     const form = document.getElementById("analyze-form");
     const resultDiv = document.getElementById("result");
+    const video = document.getElementById("video");
+    const preview = document.getElementById("preview");
+    const startCameraBtn = document.getElementById("start-camera");
+    const captureBtn = document.getElementById("capture");
+    const retakeBtn = document.getElementById("retake");
+    
+    let stream = null;
+    let capturedBlob = null;
+
+    // Start camera
+    startCameraBtn.addEventListener("click", async () => {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        video.srcObject = stream;
+        video.classList.remove("hidden");
+        preview.classList.add("hidden");
+        startCameraBtn.classList.add("hidden");
+        captureBtn.classList.remove("hidden");
+        retakeBtn.classList.add("hidden");
+      } catch (err) {
+        alert("Could not access camera: " + err.message);
+      }
+    });
+
+    // Capture photo
+    captureBtn.addEventListener("click", () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(video, 0, 0);
+      
+      // Convert canvas to blob and show preview
+      canvas.toBlob((blob) => {
+        capturedBlob = blob;
+        const imageUrl = URL.createObjectURL(blob);
+        preview.src = imageUrl;
+        
+        // Stop and hide video, show preview
+        if (stream) {
+          stream.getTracks().forEach(track => track.stop());
+        }
+        video.pause();
+        video.srcObject = null;
+        video.classList.add("hidden");
+        preview.classList.remove("hidden");
+        
+        captureBtn.classList.add("hidden");
+        retakeBtn.classList.remove("hidden");
+        resultDiv.innerHTML = "✅ Photo captured! Click 'Analyze' to process.";
+      }, "image/jpeg", 0.9);
+    });
+
+    // Retake photo
+    retakeBtn.addEventListener("click", async () => {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        video.srcObject = stream;
+        video.play();
+        video.classList.remove("hidden");
+        preview.classList.add("hidden");
+        capturedBlob = null;
+        retakeBtn.classList.add("hidden");
+        captureBtn.classList.remove("hidden");
+        resultDiv.innerHTML = "";
+      } catch (err) {
+        alert("Could not access camera: " + err.message);
+      }
+    });
 
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
 
-      const formData = new FormData(form);
+      const formData = new FormData();
+      
+      // Priority: captured photo > uploaded file > URL
+      if (capturedBlob) {
+        formData.append("image_file", capturedBlob, "camera-capture.jpg");
+      } else if (form.elements.image_file.files[0]) {
+        formData.append("image_file", form.elements.image_file.files[0]);
+      } else if (form.elements.image_url.value) {
+        formData.append("image_url", form.elements.image_url.value);
+      }
+
       resultDiv.innerHTML = "⏳ Analyzing image...";
 
       const res = await fetch("/analyze", {
