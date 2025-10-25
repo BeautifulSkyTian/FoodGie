@@ -23,6 +23,13 @@ class CameraController {
   }
 
   async startCamera() {
+    // Check if getUserMedia is supported
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      alert("Camera access is not supported on this browser or requires HTTPS. Please use HTTPS or try a different browser.");
+      console.error("getUserMedia not supported. Current protocol:", window.location.protocol);
+      return;
+    }
+
     try {
       // iOS-specific constraints
       const constraints = {

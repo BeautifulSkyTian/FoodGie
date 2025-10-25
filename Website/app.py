@@ -47,19 +47,28 @@ def analyze():
     image_url = request.form.get("image_url")
     image_file = request.files.get("image_file")
 
+    print(f"DEBUG - Received image_url: {image_url}")
+    print(f"DEBUG - Received image_file: {image_file}")
+
     parts = [{"text": prompt}]
 
     if image_url:
+        print(f"DEBUG - Attempting to fetch URL: {image_url}")
         try:
-            response = requests.get(image_url)
+            response = requests.get(image_url, timeout=10)
             response.raise_for_status()
+            print(
+                f"DEBUG - Successfully fetched image, size: {len(response.content)} bytes"
+            )
             parts.append(
                 {"inline_data": {"mime_type": "image/jpeg", "data": response.content}}
             )
         except Exception as e:
+            print(f"DEBUG - Failed to fetch image: {str(e)}")
             return jsonify({"error": f"Failed to fetch image: {str(e)}"}), 400
 
     elif image_file:
+        print(f"DEBUG - Processing uploaded file: {image_file.filename}")
         parts.append(
             {
                 "inline_data": {
@@ -69,6 +78,7 @@ def analyze():
             }
         )
     else:
+        print("DEBUG - No image provided")
         return jsonify({"error": "No image provided"}), 400
 
     gemini_response = client.models.generate_content(
