@@ -22,6 +22,16 @@ def index():
     return render_template("index.html")
 
 
+@app.route("/settings")
+def settings():
+    return render_template("settings.html")
+
+
+@app.route("/fridge")
+def fridge():
+    return render_template("fridge.html")
+
+
 @app.route("/analyze", methods=["POST"])
 def analyze():
     prompt = """In python dictionary format, give me the following info for each food item in the image: name, type (e.g. protein/fruit/vegetable),
