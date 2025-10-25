@@ -11,10 +11,11 @@ app = Flask(__name__)
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 # id for the json bin. Stores all data.
-BIN_ID = '68fd49ac43b1c97be980cfb7'
+BIN_ID = "68fd49ac43b1c97be980cfb7"
 
 # id for testing only, contains garbage.
-TEST_BIN_ID = '68fd3d3c43b1c97be980b98b'
+TEST_BIN_ID = "68fd3d3c43b1c97be980b98b"
+
 
 @app.route("/")
 def index():
@@ -94,11 +95,12 @@ def analyze():
     print(gemini_response.text)
 
     # change TEST_BIN_ID to BIN_ID for actual use
-    data.store_data_to_bin(data.parse_gemini_inventory_output(gemini_response.text), TEST_BIN_ID)
+    data.store_data_to_bin(
+        data.parse_gemini_inventory_output(gemini_response.text), TEST_BIN_ID
+    )
 
     return jsonify({"response": gemini_response.text})
 
 
 if __name__ == "__main__":
     app.run(debug=True)
-    
