@@ -277,6 +277,7 @@ header h1 {
   padding: 1rem;
   border-radius: 0.5rem;
   display: none;
+  text-align: center; 
 }
 
 .result:not(:empty) {
@@ -293,6 +294,15 @@ header h1 {
   background: #E8F8F2;
   color: #0D6B4D;
   border: 2px solid var(--accent-color);
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 80px;
+}
+
+.result:not(:empty).success {
+  display: flex; 
 }
 
 .result.error {
