@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>⚙️ Settings - FooGie</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <style>
+    .settings-section {
+      margin-bottom: 2rem;
+    }
+    
+    .settings-section h3 {
+      margin-bottom: 1rem;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .setting-item {
+      background: var(--bg-color);
+      padding: 1rem;
+      border-radius: 0.5rem;
+      margin-bottom: 1rem;
+      border: 1px solid var(--border-color);
+    }
+    
+    .setting-label {
+      display: flex;
+      justify-content: between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+    }
+    
+    .setting-label span {
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    
+    .setting-description {
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      margin-bottom: 0.75rem;
+    }
+    
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 50px;
+      height: 24px;
+    }
+    
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #ccc;
+      transition: .4s;
+      border-radius: 24px;
+    }
+    
+    .toggle-slider:before {
+      position: absolute;
+      content: "";
+      height: 16px;
+      width: 16px;
+      left: 4px;
+      bottom: 4px;
+      background-color: white;
+      transition: .4s;
+      border-radius: 50%;
+    }
+    
+    input:checked + .toggle-slider {
+      background-color: var(--accent-color);
+    }
+    
+    input:checked + .toggle-slider:before {
+      transform: translateX(26px);
+    }
+    
+    .select-input {
+      width: 100%;
+      padding: 0.75rem;
+      border: 2px solid var(--border-color);
+      border-radius: 0.5rem;
+      font-size: 1rem;
+      background: white;
+    }
+    
+    .btn-danger {
+      background: #ef4444;
+      color: white;
+    }
+    
+    .btn-danger:hover {
+      background: #dc2626;
+    }
+    
+    .save-settings {
+      position: sticky;
+      bottom: 1rem;
+      background: var(--card-bg);
+      padding: 1rem;
+      border-radius: 0.5rem;
+      box-shadow: var(--shadow-lg);
+      margin-top: 2rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="page-wrapper">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-card">
+        <h3><span>☰</span> Menu</h3>
+        <ul class="menu-list">
+          <li>
+            <a href="/">
+              <span class="icon">🏠</span>
+              <span>Home</span>
+            </a>
+          </li>
+          <li>
+            <a href="#history">
+              <span class="icon">🗄️</span>
+              <span>My Fridge</span>
+            </a>
+          </li>
+          <li>
+            <a href="#nutrition">
+              <span class="icon">🥗</span>
+              <span>Recipes</span>
+            </a>
+          </li>
+        </ul>
+        
+        <div class="menu-divider"></div>
+        
+        <ul class="menu-list">
+          <li>
+            <a href="/settings">
+              <span class="icon">⚙️</span>
+              <span>Settings</span>
+            </a>
+          </li>
+        </ul>
+
+        <div class="sidebar-footer">
+          <p>Version 1.0.0</p>
+        </div>
+      </div>
+    </aside>
+
+    <div class="container">
+      <header>
+        <h1>⚙️ Settings</h1>
+        <p class="subtitle">Customize your FooGie experience</p>
+      </header>
+
+      <main>
+        <div class="card">
+          <form id="settings-form">
+            
+            <!-- Application Settings -->
+            <div class="settings-section">
+              <h3>📱 Application Settings</h3>
+                <div class="setting-item">
+                <div class="setting-label">
+                  <span>Notifications</span>
+                  <label class="toggle-switch">
+                    <input type="checkbox" id="notifications" checked>
+                    <span class="toggle-slider"></span>
+                  </label>
+                </div>
+                <div class="setting-description">
+                  Receive notifications for expiring food items
+                </div>
+
+              </div>
+            </div>
+
+            <!-- Analysis Settings -->
+            <div class="settings-section">
+              <h3>🔍 Analysis Settings</h3>
+              
+              <div class="setting-item">
+                <div class="setting-label">
+                  <span>Preferred Units</span>
+                </div>
+                <div class="setting-description">
+                  Choose your preferred measurement system
+                </div>
+                <select class="select-input" id="units">
+                  <option value="metric">Metric (grams, kilograms)</option>
+                  <option value="imperial">Imperial (ounces, pounds)</option>
+                  <option value="both">Show both</option>
+                </select>
+              </div>
+              
+              <div class="setting-item">
+                <div class="setting-label">
+                  <span>Default Expiry Period</span>
+                </div>
+                <div class="setting-description">
+                  Default shelf life for items without specific expiry dates
+                </div>
+                <select class="select-input" id="default-expiry">
+                  <option value="3">3 days</option>
+                  <option value="5" selected>5 days</option>
+                  <option value="7">7 days</option>
+                  <option value="14">14 days</option>
+                </select>
+              </div>
+            </div>
+            <!-- Save Settings -->
+            <div class="save-settings">
+              <button type="submit" class="btn btn-primary" style="width: 100%;">
+                <span>💾</span> Save Settings
+              </button>
+            </div>
+          </form>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script>
+    // Load saved settings
+    document.addEventListener('DOMContentLoaded', function() {
+      const savedSettings = JSON.parse(localStorage.getItem('foogie-settings') || '{}');
+      
+      // Apply saved settings to form elements
+      document.getElementById('notifications').checked = savedSettings.notifications !== false;
+      document.getElementById('units').value = savedSettings.units || 'metric';
+      document.getElementById('default-expiry').value = savedSettings.defaultExpiry || '5';
+      
+    });
+
+    // Handle form submission
+    document.getElementById('settings-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      
+      const settings = {
+        notifications: document.getElementById('notifications').checked,
+        units: document.getElementById('units').value,
+        defaultExpiry: document.getElementById('default-expiry').value
+      };
+      
+      // Save to localStorage
+      localStorage.setItem('foogie-settings', JSON.stringify(settings));
+      
+      // Show success message
+      alert('Settings saved successfully!');
+    });
+  </script>
+</body>
+</html>
