@@ -6,3 +6,5 @@ With a simple photo, get the nutrition information of your fridge, possible reci
 
 Built using Python, Flask, and Gemini API.
 
+Supports camera functionality for easy photo capture, links, and file uploads.
+
