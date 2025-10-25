@@ -3,6 +3,7 @@ from google import genai
 import os
 from dotenv import load_dotenv
 import requests
+import data
 
 load_dotenv()
 
@@ -10,7 +11,10 @@ app = Flask(__name__)
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 # id for the json bin. Stores all data.
-BIN_ID = '68fd3db7d0ea881f40bbb460'
+BIN_ID = '68fd49ac43b1c97be980cfb7'
+
+# id for testing only, contains garbage.
+TEST_BIN_ID = '68fd3d3c43b1c97be980b98b'
 
 @app.route("/")
 def index():
@@ -19,10 +23,10 @@ def index():
 
 @app.route("/analyze", methods=["POST"])
 def analyze():
-    prompt = """In json format, give me the following info for each food item in the image: name, type (e.g. protein/fruit/vegetable),
+    prompt = """In python dictionary format, give me the following info for each food item in the image: name, type (e.g. protein/fruit/vegetable),
     quantity(number if possible, or weight. Return this as an integer, even weight),
     expected_expiry_date (assume the date is bought on the day, and the item is put in a fridge).
-    and calories. Format: json{
+    and calories. Format: {
             "inventory": [
                 {
                     "name": "orange",
@@ -71,9 +75,14 @@ def analyze():
         model="gemini-2.0-flash",
         contents=[{"role": "user", "parts": parts}],
     )
+    print(gemini_response.text)
+
+    # change TEST_BIN_ID to BIN_ID for actual use
+    data.store_data_to_bin(data.parse_gemini_inventory_output(gemini_response.text), TEST_BIN_ID)
 
     return jsonify({"response": gemini_response.text})
 
 
 if __name__ == "__main__":
     app.run(debug=True)
+    

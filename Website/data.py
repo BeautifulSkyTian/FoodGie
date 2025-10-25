@@ -24,6 +24,26 @@ def _parse_expiry_date(date_str: str) -> datetime:
         return datetime.max
 
 
+def parse_gemini_inventory_output(raw_text: str) -> dict or None:
+    """
+    Parses the raw text output from Gemini, attempting to extract and deserialize
+    the JSON inventory dictionary. Handles Markdown code fences.
+    """
+    # 1. Clean the text by removing common Markdown fences
+    if raw_text.startswith("```json"):
+        clean_text = raw_text.strip().removeprefix("```json").removesuffix("```").strip()
+    else:
+        clean_text = raw_text.strip()
+        
+    try:
+        # 2. Deserialize the JSON string into a Python dictionary
+        parsed_data = json.loads(clean_text)
+        print("Successfully parsed Gemini output into dictionary.")
+        return parsed_data
+    except json.JSONDecodeError as e:
+        print(f"Error decoding JSON from Gemini output: {e}")
+        print(f"Raw text attempting to parse: {clean_text[:200]}...")
+        return None
 # --- Core JSONBin Functions ---
 
 def read_data_from_bin(bin_id: str) -> Optional[Dict[str, Any]]:
