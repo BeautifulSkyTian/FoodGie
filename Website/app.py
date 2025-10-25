@@ -9,6 +9,8 @@ load_dotenv()
 app = Flask(__name__)
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
+# id for the json bin. Stores all data.
+BIN_ID = '68fd3db7d0ea881f40bbb460'
 
 @app.route("/")
 def index():
