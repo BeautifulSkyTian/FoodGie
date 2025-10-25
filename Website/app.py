@@ -2,7 +2,7 @@ from flask import Flask, request, render_template, jsonify
 from google import genai
 import os
 from dotenv import load_dotenv
-import requests  # <-- new import
+import requests
 
 load_dotenv()
 
