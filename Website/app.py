@@ -3,12 +3,18 @@ from google import genai
 import os
 from dotenv import load_dotenv
 import requests
+import data
 
 load_dotenv()
 
 app = Flask(__name__)
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
+# id for the json bin. Stores all data.
+BIN_ID = '68fd49ac43b1c97be980cfb7'
+
+# id for testing only, contains garbage.
+TEST_BIN_ID = '68fd3d3c43b1c97be980b98b'
 
 @app.route("/")
 def index():
@@ -17,7 +23,27 @@ def index():
 
 @app.route("/analyze", methods=["POST"])
 def analyze():
-    prompt = "In json format, Tell me the calories of the food in the image? Assume everything was bought on October 21st, 2020, and was stored in the fridge. Give roughly how long it will last."
+    prompt = """In python dictionary format, give me the following info for each food item in the image: name, type (e.g. protein/fruit/vegetable),
+    quantity(number if possible, or weight. Return this as an integer, even weight),
+    expected_expiry_date (assume the date is bought on the day, and the item is put in a fridge).
+    and calories. Format: {
+            "inventory": [
+                {
+                    "name": "orange",
+                    "type": "fruit",
+                    "quantity": 6,
+                    "expected_expiry_date": "18/11/2025",
+                    "calories": 62
+                },
+                { # GROUND BEEF BATCH 2 (Later Expiry, New Quantity)
+                    "name": "ground beef",
+                    "type": "protein",
+                    "quantity": 500.0,
+                    "expected_expiry_date": "20/11/2025",
+                    "calories": 1250
+                }
+            ]
+        }"""
     image_url = request.form.get("image_url")
     image_file = request.files.get("image_file")
 
@@ -55,41 +81,18 @@ def analyze():
         print("DEBUG - No image provided")
         return jsonify({"error": "No image provided"}), 400
 
-    print("DEBUG - Sending to Gemini API")
-    try:
-        gemini_response = client.models.generate_content(
-            model="gemini-2.0-flash",
-            contents=[{"role": "user", "parts": parts}],
-        )
-        print(f"DEBUG - Gemini response received: {gemini_response.text[:100]}...")
-        return jsonify({"response": gemini_response.text})
-    except Exception as e:
-        print(f"DEBUG - Gemini API error: {str(e)}")
-        return jsonify({"error": f"Gemini API error: {str(e)}"}), 500
+    gemini_response = client.models.generate_content(
+        model="gemini-2.0-flash",
+        contents=[{"role": "user", "parts": parts}],
+    )
+    print(gemini_response.text)
+
+    # change TEST_BIN_ID to BIN_ID for actual use
+    data.store_data_to_bin(data.parse_gemini_inventory_output(gemini_response.text), TEST_BIN_ID)
+
+    return jsonify({"response": gemini_response.text})
 
 
 if __name__ == "__main__":
-    # For iOS camera support, run with HTTPS
-    # Generate self-signed certificate:
-    # openssl req -x509 -newkey rsa:4096 -nodes -out cert.pem -keyout key.pem -days 365
-
-    import os
-
-    cert_path = "cert.pem"
-    key_path = "key.pem"
-
-    if os.path.exists(cert_path) and os.path.exists(key_path):
-        # Run with HTTPS if certificates exist
-        app.run(
-            debug=True, ssl_context=(cert_path, key_path), host="0.0.0.0", port=5000
-        )
-    else:
-        # Run without HTTPS (camera won't work on iOS)
-        print(
-            "\n⚠️  WARNING: Running without HTTPS. Camera will not work on iOS Safari."
-        )
-        print("To enable HTTPS, generate certificates with:")
-        print(
-            "openssl req -x509 -newkey rsa:4096 -nodes -out cert.pem -keyout key.pem -days 365\n"
-        )
-        app.run(debug=True)
+    app.run(debug=True)
+    
