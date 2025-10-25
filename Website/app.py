@@ -24,7 +24,7 @@ def index():
 @app.route("/analyze", methods=["POST"])
 def analyze():
     prompt = """In python dictionary format, give me the following info for each food item in the image: name, type (e.g. protein/fruit/vegetable),
-    quantity(number if possible, or weight. Return this as an integer, even weight),
+    quantity(number of items if possible, or weight, not volume. Return this as an integer, even weight),
     expected_expiry_date (assume the date is bought on the day, and the item is put in a fridge).
     ,calories, carbs, fats, protein (all these as integers). Format: {
             "inventory": [
