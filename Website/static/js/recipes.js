@@ -142,25 +142,32 @@ class RecipeManager {
    * Returns: {name: "banana", quantity: 2, unit: "items"}
    */
   parseInventoryItem(itemString) {
+    console.log('Parsing inventory item:', itemString);
+    
     // Try to match pattern: "X unit of name (nutrition...)"
-    const match = itemString.match(/^(\d+(?:\.\d+)?)\s+(items|grams|containers|eggs)\s+of\s+([a-zA-Z\s]+)/i);
+    // Make regex more flexible to handle various formats
+    const match = itemString.match(/^(\d+(?:\.\d+)?)\s+(items?|grams?|containers?|eggs?)\s+(?:of\s+)?([a-zA-Z\s]+?)(?:\s*\(|$)/i);
     
     if (match) {
-      return {
+      const parsed = {
         name: match[3].trim().toLowerCase(),
         quantity: parseFloat(match[1]),
-        unit: match[2].toLowerCase()
+        unit: match[2].toLowerCase().replace(/s$/, '') // Remove plural 's'
       };
+      console.log('Successfully parsed:', parsed);
+      return parsed;
     }
     
-    // Fallback: try to extract just quantity and name
-    const simpleMatch = itemString.match(/^(\d+(?:\.\d+)?)\s+([a-zA-Z\s]+)/i);
+    // Fallback: try to extract just quantity and name (without unit specified)
+    const simpleMatch = itemString.match(/^(\d+(?:\.\d+)?)\s+([a-zA-Z\s]+?)(?:\s*\(|$)/i);
     if (simpleMatch) {
-      return {
+      const parsed = {
         name: simpleMatch[2].trim().toLowerCase(),
         quantity: parseFloat(simpleMatch[1]),
-        unit: 'items' // default
+        unit: 'item' // default singular
       };
+      console.log('Parsed with fallback:', parsed);
+      return parsed;
     }
     
     console.warn('Could not parse inventory item:', itemString);
@@ -174,20 +181,31 @@ class RecipeManager {
     const consumedMap = {};
     const inventoryItems = recipe.inventory_items_used || [];
     
-    inventoryItems.forEach(itemString => {
+    console.log('Extracting consumption from recipe:', recipe.name);
+    console.log('Inventory items to parse:', inventoryItems);
+    
+    inventoryItems.forEach((itemString, index) => {
       const parsed = this.parseInventoryItem(itemString);
       if (parsed) {
-        // Use the food name as key
+        // Use the food name as key (lowercase for consistency)
         const key = parsed.name;
+        
+        console.log(`Item ${index + 1}: ${key} = ${parsed.quantity} ${parsed.unit}`);
         
         // If already exists, add to it
         if (consumedMap[key]) {
+          console.log(`  Adding to existing: ${consumedMap[key]} + ${parsed.quantity}`);
           consumedMap[key] += parsed.quantity;
         } else {
           consumedMap[key] = parsed.quantity;
         }
+      } else {
+        console.error('Failed to parse item:', itemString);
       }
     });
+    
+    console.log('Final consumption map:', consumedMap);
+    console.log('Total items to consume:', Object.keys(consumedMap).length);
     
     return consumedMap;
   }
@@ -372,10 +390,19 @@ class RecipeManager {
 
     // Extract consumption data
     const consumedMap = this.extractConsumptionData(recipe);
+    console.log('========================================');
+    console.log('RECIPE USE INITIATED:', recipe.name);
     console.log('Extracted consumption data:', consumedMap);
+    console.log('Number of different items to consume:', Object.keys(consumedMap).length);
+    console.log('========================================');
 
     if (Object.keys(consumedMap).length === 0) {
-      console.warn('No inventory items to consume');
+      console.warn('⚠️ No inventory items to consume - this might be inventory_only: false recipe');
+      
+      // Still allow logging the meal even if no inventory items
+      if (!confirm('No inventory items found to consume. Continue logging the meal anyway?')) {
+        return;
+      }
     }
 
     try {
@@ -386,7 +413,10 @@ class RecipeManager {
 
       // 1. Consume items from fridge
       if (Object.keys(consumedMap).length > 0) {
-        console.log('Consuming items from fridge:', consumedMap);
+        console.log('📦 Sending consumption request to server...');
+        console.log('Bin ID:', this.BIN_ID);
+        console.log('Payload:', JSON.stringify({ consumed: consumedMap }, null, 2));
+        
         const consumeResponse = await fetch(`/api/consume/${this.BIN_ID}`, {
           method: 'POST',
           headers: {
@@ -397,20 +427,26 @@ class RecipeManager {
 
         if (!consumeResponse.ok) {
           const errorData = await consumeResponse.json();
+          console.error('❌ Server error:', errorData);
           throw new Error(`Failed to update fridge: ${errorData.error || 'Unknown error'}`);
         }
 
         const consumeData = await consumeResponse.json();
-        console.log('Fridge updated successfully:', consumeData);
+        console.log('✅ Fridge updated successfully:', consumeData);
+        console.log('Items consumed:', Object.entries(consumedMap).map(([name, qty]) => `${qty}x ${name}`).join(', '));
+      } else {
+        console.log('⏭️ Skipping fridge update (no items to consume)');
       }
 
       // 2. Log the meal to calorie tracker
+      console.log('📊 Logging meal to calorie tracker...');
       await this.calorieTracker.logMeal(recipe.name, totalCalories, {
         protein: (nutrition.protein || 0) * servings,
         carbs: (nutrition.carbs || 0) * servings,
         fats: (nutrition.fats || 0) * servings,
         servings: servings
       });
+      console.log('✅ Meal logged successfully');
 
       // 3. Update the card to show it's been used
       cardElement.classList.add('recipe-used');
@@ -422,15 +458,22 @@ class RecipeManager {
       const message = document.createElement('div');
       message.className = 'result success';
       message.style.marginTop = '1rem';
+      
+      const consumedText = Object.keys(consumedMap).length > 0 
+        ? `<p>🗄️ Fridge updated: ${Object.entries(consumedMap).map(([name, qty]) => `${qty} ${name}`).join(', ')} removed</p>`
+        : '<p>🗄️ No fridge items consumed</p>';
+      
       message.innerHTML = `
         <p><strong>✅ Success!</strong></p>
         <p>🍽️ Meal logged: ${totalCalories} calories</p>
-        <p>🗄️ Fridge updated: ${Object.entries(consumedMap).map(([name, qty]) => `${qty} ${name}`).join(', ')} removed</p>
+        ${consumedText}
         <p>📊 Remaining today: ${summary.remaining} cal (${summary.mealsLeft} meals left = ~${summary.caloriesPerMeal} cal/meal)</p>
       `;
       cardElement.appendChild(message);
 
-      console.log('Recipe completed successfully. Summary:', summary);
+      console.log('🎉 Recipe completed successfully');
+      console.log('Summary:', summary);
+      console.log('========================================\n');
 
       // 5. Refresh the calorie summary banner
       this.displayCalorieSummary();
@@ -439,14 +482,15 @@ class RecipeManager {
       window.scrollTo({ top: 0, behavior: 'smooth' });
 
     } catch (error) {
-      console.error('Error processing recipe:', error);
+      console.error('❌ Error processing recipe:', error);
+      console.error('Stack trace:', error.stack);
       
       // Reset button on error
       const useBtn = cardElement.querySelector('.use-recipe-btn');
       useBtn.innerHTML = '<span>❌</span> Error - Try Again';
       useBtn.disabled = false;
       
-      alert(`Failed to process recipe: ${error.message}\n\nPlease try again or check the console for details.`);
+      alert(`Failed to process recipe: ${error.message}\n\nPlease check the console for details and try again.`);
     }
   }
 
