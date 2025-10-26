@@ -132,7 +132,7 @@
             </a>
           </li>
           <li>
-            <a href="#history">
+            <a href="/fridge">
               <span class="icon">🗄️</span>
               <span>My Fridge</span>
             </a>
@@ -189,7 +189,75 @@
 
               </div>
             </div>
-
+<!-- Nutrition Settings -->
+<div class="settings-section">
+  <h3>🍽️ Nutrition Settings</h3>
+  
+  <div class="setting-item">
+    <div class="setting-label">
+      <span>Daily Calorie Goal</span>
+    </div>
+    <div class="setting-description">
+      Set your daily calorie target for better nutritional tracking
+    </div>
+    <div style="display: flex; align-items: center; gap: 0.5rem;">
+      <input 
+        type="number" 
+        id="daily-calories" 
+        min="0" 
+        max="10000" 
+        step="50"
+        class="text-input"
+        style="flex: 1;"
+        placeholder="e.g., 2000"
+      >
+      <span style="color: var(--text-secondary); white-space: nowrap;">calories</span>
+    </div>
+  </div>
+  
+  <div class="setting-item">
+    <div class="setting-label">
+      <span>Daily Number of Meals</span>
+    </div>
+    <div class="setting-description">
+      How many meals do you typically eat per day?
+    </div>
+    <select class="select-input" id="daily-meals">
+      <option value="1">1 meal</option>
+      <option value="2">2 meals</option>
+      <option value="3" selected>3 meals</option>
+      <option value="4">4 meals</option>
+      <option value="5">5 meals</option>
+      <option value="6">6+ meals</option>
+    </select>
+  </div>
+  
+  <div class="setting-item">
+    <div class="setting-label">
+      <span>Show Calorie Progress</span>
+      <label class="toggle-switch">
+        <input type="checkbox" id="show-calorie-progress" checked>
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+    <div class="setting-description">
+      Display daily calorie progress and remaining calories
+    </div>
+  </div>
+  
+  <div class="setting-item">
+    <div class="setting-label">
+      <span>Meal Reminders</span>
+      <label class="toggle-switch">
+        <input type="checkbox" id="meal-reminders">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+    <div class="setting-description">
+      Receive reminders based on your meal schedule
+    </div>
+  </div>
+</div>
             <!-- Analysis Settings -->
             <div class="settings-section">
               <h3>🔍 Analysis Settings</h3>
@@ -236,32 +304,45 @@
   </div>
 
   <script>
-    // Load saved settings
-    document.addEventListener('DOMContentLoaded', function() {
-      const savedSettings = JSON.parse(localStorage.getItem('foogie-settings') || '{}');
-      
-      // Apply saved settings to form elements
-      document.getElementById('notifications').checked = savedSettings.notifications !== false;
-      document.getElementById('units').value = savedSettings.units || 'metric';
-      document.getElementById('default-expiry').value = savedSettings.defaultExpiry || '5';
-      
-    });
+// Load saved settings
+document.addEventListener('DOMContentLoaded', function() {
+  const savedSettings = JSON.parse(localStorage.getItem('foogie-settings') || '{}');
+  
+  // Apply saved settings to form elements
+  document.getElementById('notifications').checked = savedSettings.notifications !== false;
+  document.getElementById('units').value = savedSettings.units || 'metric';
+  document.getElementById('default-expiry').value = savedSettings.defaultExpiry || '5';
+  
+  // Nutrition settings
+  document.getElementById('daily-calories').value = savedSettings.dailyCalories || '';
+  document.getElementById('daily-meals').value = savedSettings.dailyMeals || '3';
+  document.getElementById('show-calorie-progress').checked = savedSettings.showCalorieProgress !== false;
+  document.getElementById('meal-reminders').checked = savedSettings.mealReminders || false;
+  
+});
 
-    // Handle form submission
-    document.getElementById('settings-form').addEventListener('submit', function(e) {
-      e.preventDefault();
-      
-      const settings = {
-        notifications: document.getElementById('notifications').checked,
-        units: document.getElementById('units').value,
-        defaultExpiry: document.getElementById('default-expiry').value
-      };
-      
-      // Save to localStorage
-      localStorage.setItem('foogie-settings', JSON.stringify(settings));
-      
-      // Show success message
-      alert('Settings saved successfully!');
+// Handle form submission
+document.getElementById('settings-form').addEventListener('submit', function(e) {
+  e.preventDefault();
+  
+  const settings = {
+    notifications: document.getElementById('notifications').checked,
+    units: document.getElementById('units').value,
+    defaultExpiry: document.getElementById('default-expiry').value,
+    // Nutrition settings
+    dailyCalories: parseInt(document.getElementById('daily-calories').value) || null,
+    dailyMeals: document.getElementById('daily-meals').value,
+    showCalorieProgress: document.getElementById('show-calorie-progress').checked,
+    mealReminders: document.getElementById('meal-reminders').checked
+  };
+  
+  // Save to localStorage
+  localStorage.setItem('foogie-settings', JSON.stringify(settings));
+  
+  
+  // Show success message
+  alert('Settings saved successfully!');
+});
     });
   </script>
 </body>
