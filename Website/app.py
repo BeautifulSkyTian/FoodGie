@@ -31,6 +31,31 @@ def settings():
 def fridge():
     return render_template("fridge.html")
 
+@app.route("/api/fridge/<bin_id>")
+def get_fridge_data(bin_id):
+    fridge_data = data.read_data_from_bin(bin_id)
+    if fridge_data:
+        return jsonify(fridge_data)
+    else:
+        return jsonify({"error": "Failed to retrieve fridge data"}), 500
+
+@app.route("/api/fridge/<bin_id>", methods=["PUT"])
+def update_fridge_data(bin_id):
+    updated_data = request.json
+    
+    url = f"{data.BASE_URL}/{bin_id}"
+    headers = {
+        'Content-Type': 'application/json',
+        'X-Master-Key': data.MASTER_KEY
+    }
+    
+    response = requests.put(url, headers=headers, data=json.dumps(updated_data))
+    
+    try:
+        response.raise_for_status()
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/analyze", methods=["POST"])
 def analyze():
