@@ -4,14 +4,12 @@ import os
 from dotenv import load_dotenv
 import requests
 import data
-<<<<<<< Updated upstream
 from datetime import datetime
 
 
 today_date = datetime.now().strftime("%d/%m/%Y")
-=======
 import json
->>>>>>> Stashed changes
+
 
 load_dotenv()
 
@@ -40,14 +38,13 @@ def fridge():
     return render_template("fridge.html")
 
 
-<<<<<<< Updated upstream
-=======
+
 @app.route("/recipes")
 def recipes_page():
     return render_template("recipes.html")
 
 
->>>>>>> Stashed changes
+
 @app.route("/api/fridge/<bin_id>")
 def get_fridge_data(bin_id):
     fridge_data = data.read_data_from_bin(bin_id)
@@ -73,8 +70,7 @@ def update_fridge_data(bin_id):
         return jsonify({"error": str(e)}), 500
 
 
-<<<<<<< Updated upstream
-=======
+
 @app.route("/api/generate-recipes", methods=["POST"])
 def generate_recipes():
     """Generate recipe recommendations based on inventory, prioritizing expiring items"""
@@ -280,7 +276,7 @@ def calorie_tracker():
             "message": f"Logged {calories} calories from {recipe_name}"
         })
 
->>>>>>> Stashed changes
+
 @app.route("/analyze", methods=["POST"])
 def analyze():
     prompt = f"""Analyze this food image and return the data as a Python dictionary. Follow these guidelines carefully:
