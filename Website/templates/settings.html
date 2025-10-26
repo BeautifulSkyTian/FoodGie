@@ -31,11 +31,13 @@
       justify-content: between;
       align-items: center;
       margin-bottom: 0.5rem;
+      gap: 1rem;
     }
     
     .setting-label span {
       font-weight: 600;
       color: var(--text-primary);
+      flex: 1;
     }
     
     .setting-description {
@@ -49,6 +51,8 @@
       display: inline-block;
       width: 50px;
       height: 24px;
+      flex-shrink: 0;
+      margin-left: auto;
     }
     
     .toggle-switch input {
@@ -258,39 +262,6 @@
     </div>
   </div>
 </div>
-            <!-- Analysis Settings -->
-            <div class="settings-section">
-              <h3>🔍 Analysis Settings</h3>
-              
-              <div class="setting-item">
-                <div class="setting-label">
-                  <span>Preferred Units</span>
-                </div>
-                <div class="setting-description">
-                  Choose your preferred measurement system
-                </div>
-                <select class="select-input" id="units">
-                  <option value="metric">Metric (grams, kilograms)</option>
-                  <option value="imperial">Imperial (ounces, pounds)</option>
-                  <option value="both">Show both</option>
-                </select>
-              </div>
-              
-              <div class="setting-item">
-                <div class="setting-label">
-                  <span>Default Expiry Period</span>
-                </div>
-                <div class="setting-description">
-                  Default shelf life for items without specific expiry dates
-                </div>
-                <select class="select-input" id="default-expiry">
-                  <option value="3">3 days</option>
-                  <option value="5" selected>5 days</option>
-                  <option value="7">7 days</option>
-                  <option value="14">14 days</option>
-                </select>
-              </div>
-            </div>
             <!-- Save Settings -->
             <div class="save-settings">
               <button type="submit" class="btn btn-primary" style="width: 100%;">
@@ -310,8 +281,6 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // Apply saved settings to form elements
   document.getElementById('notifications').checked = savedSettings.notifications !== false;
-  document.getElementById('units').value = savedSettings.units || 'metric';
-  document.getElementById('default-expiry').value = savedSettings.defaultExpiry || '5';
   
   // Nutrition settings
   document.getElementById('daily-calories').value = savedSettings.dailyCalories || '';
