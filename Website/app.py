@@ -4,10 +4,14 @@ import os
 from dotenv import load_dotenv
 import requests
 import data
+<<<<<<< Updated upstream
 from datetime import datetime
 
 
 today_date = datetime.now().strftime("%d/%m/%Y")
+=======
+import json
+>>>>>>> Stashed changes
 
 load_dotenv()
 
@@ -36,6 +40,14 @@ def fridge():
     return render_template("fridge.html")
 
 
+<<<<<<< Updated upstream
+=======
+@app.route("/recipes")
+def recipes_page():
+    return render_template("recipes.html")
+
+
+>>>>>>> Stashed changes
 @app.route("/api/fridge/<bin_id>")
 def get_fridge_data(bin_id):
     fridge_data = data.read_data_from_bin(bin_id)
@@ -61,6 +73,214 @@ def update_fridge_data(bin_id):
         return jsonify({"error": str(e)}), 500
 
 
+<<<<<<< Updated upstream
+=======
+@app.route("/api/generate-recipes", methods=["POST"])
+def generate_recipes():
+    """Generate recipe recommendations based on inventory, prioritizing expiring items"""
+    try:
+        # Read inventory from bin
+        inventory_data = data.read_data_from_bin(TEST_BIN_ID)  # Change to BIN_ID for actual use
+        
+        if not inventory_data or "inventory" not in inventory_data:
+            return jsonify({"error": "No inventory found"}), 400
+        
+        items = inventory_data["inventory"]
+        
+        if not items:
+            return jsonify({"error": "Inventory is empty"}), 400
+        
+        # Sort by expiry date (earliest first)
+        from datetime import datetime
+        
+        def parse_date(item):
+            try:
+                return datetime.strptime(item.get("expected_expiry_date", "31/12/2099"), "%d/%m/%Y")
+            except:
+                return datetime.max
+        
+        sorted_items = sorted(items, key=parse_date)
+        
+        # Analyze inventory diversity by type
+        type_counts = {}
+        for item in sorted_items:
+            item_type = item.get('type', 'other')
+            type_counts[item_type] = type_counts.get(item_type, 0) + 1
+        
+        available_types = list(type_counts.keys())
+        
+        # Create a formatted inventory list for Gemini with nutritional info
+        inventory_text = "Current Inventory (sorted by expiry date - USE EARLIEST EXPIRING FIRST):\n"
+        for i, item in enumerate(sorted_items, 1):
+            days_until_expiry = "Unknown"
+            try:
+                exp_date = datetime.strptime(item.get("expected_expiry_date", ""), "%d/%m/%Y")
+                days = (exp_date - datetime.now()).days
+                days_until_expiry = f"{days} days" if days > 0 else "EXPIRED" if days < 0 else "TODAY"
+            except:
+                pass
+            
+            inventory_text += f"{i}. {item.get('name', 'Unknown').upper()} ({item.get('type', 'food')})\n"
+            inventory_text += f"   - Quantity: {item.get('quantity', 'N/A')} units\n"
+            inventory_text += f"   - Expires: {item.get('expected_expiry_date', 'Unknown')} ({days_until_expiry})\n"
+            inventory_text += f"   - Nutrition (per unit): {item.get('calories', 0)} cal, "
+            inventory_text += f"{item.get('protein', 0)}g protein, {item.get('carbs', 0)}g carbs, "
+            inventory_text += f"{item.get('fats', 0)}g fats\n"
+        
+        # Get user preferences if provided
+        request_data = request.get_json() or {}
+        dietary_restrictions = request_data.get("dietary_restrictions", "")
+        cuisine_preference = request_data.get("cuisine_preference", "")
+        num_recipes = request_data.get("num_recipes", 3)
+        target_calories_per_meal = request_data.get("target_calories_per_meal", 500)
+        
+        # Build the prompt with nutritional and diversity requirements
+        prompt = f"""{inventory_text}
+
+Available food types in inventory: {', '.join(available_types)}
+
+TARGET CALORIES PER MEAL: ~{target_calories_per_meal} calories (user's remaining daily budget divided by meals left)
+
+Generate {num_recipes} diverse and nutritionally balanced recipe recommendations following these STRICT RULES:
+
+🔴 PRIORITY RULES (MOST IMPORTANT):
+1. **ALWAYS prioritize ingredients expiring soonest** (items listed first MUST be used first)
+2. Items expiring in 0-3 days = CRITICAL - MUST use in recipes
+3. Items expiring in 4-7 days = HIGH priority
+4. Items expiring in 8+ days = MEDIUM priority
+
+🏠 INVENTORY-ONLY REQUIREMENT:
+**AT LEAST ONE recipe MUST use ONLY ingredients from the inventory (no additional ingredients except basic seasonings like salt/pepper).**
+- Mark this recipe with "inventory_only": true
+- For this recipe, get creative with what's available in the fridge
+- You can assume basic pantry items: salt, pepper, cooking oil/butter
+- NO other additional ingredients allowed for the inventory-only recipe
+
+🥗 DIVERSITY REQUIREMENTS:
+1. Each recipe MUST use ingredients from AT LEAST 2-3 different food types (e.g., protein + vegetable + grain)
+2. Across all {num_recipes} recipes, try to use items from ALL available types: {', '.join(available_types)}
+3. Don't create recipes using only one food type (e.g., not just fruits or just vegetables)
+4. Balance macronutrients: aim for recipes with protein, carbs, and healthy fats
+
+📊 NUTRITIONAL REQUIREMENTS:
+1. Calculate accurate total nutrition by SUMMING the nutritional values of inventory items used
+2. For each inventory item used, multiply its nutrition by the quantity used
+3. Add estimated nutrition for additional ingredients (pantry staples)
+4. **TARGET: Aim for recipes around {target_calories_per_meal} calories per serving** (this is based on user's remaining daily calorie budget)
+5. Each recipe should aim for balanced macros:
+   - Protein: 15-30g per serving
+   - Carbs: 30-60g per serving
+   - Fats: 10-25g per serving
+6. In the recipe, show nutritional breakdown clearly
+
+🍳 RECIPE REQUIREMENTS:
+- Use realistic quantities from inventory (don't use more than available)
+- Provide clear measurements (e.g., "2 apples from inventory" or "200g ground beef from inventory")
+- Instructions should be 4-8 detailed steps
+- Cooking time should be realistic (15-60 minutes)
+
+{f"⚠️ DIETARY RESTRICTIONS: {dietary_restrictions} - STRICTLY follow these restrictions!" if dietary_restrictions else ""}
+{f"🌍 CUISINE PREFERENCE: {cuisine_preference} - Try to match this style" if cuisine_preference else ""}
+
+Format your response as a JSON array. Each recipe must include nutritional breakdown:
+
+[
+  {{
+    "name": "Recipe Name",
+    "inventory_only": false,
+    "inventory_items_used": [
+      "2 apples (190 cal, 0g protein, 50g carbs, 0g fats)",
+      "200g ground beef (250 cal, 50g protein, 0g carbs, 17g fats)"
+    ],
+    "additional_ingredients": ["1 onion (40 cal)", "2 cloves garlic (10 cal)", "salt", "pepper", "olive oil (120 cal)"],
+    "instructions": ["Step 1...", "Step 2...", "Step 3...", "Step 4..."],
+    "cooking_time": "30 minutes",
+    "servings": 2,
+    "nutrition_per_serving": {{
+      "calories": 305,
+      "protein": 25,
+      "carbs": 25,
+      "fats": 12
+    }},
+    "total_nutrition": {{
+      "calories": 610,
+      "protein": 50,
+      "carbs": 50,
+      "fats": 24
+    }},
+    "food_types_used": ["protein", "fruit", "vegetable"],
+    "urgency": "high",
+    "urgency_reason": "Uses apples expiring in 2 days"
+  }}
+]
+
+URGENCY LEVELS:
+- "high" = uses items expiring within 3 days
+- "medium" = uses items expiring within 7 days  
+- "low" = uses items expiring after 7 days
+
+IMPORTANT: 
+- Make sure nutritional calculations are accurate by adding up all ingredient values!
+- Remember: AT LEAST ONE recipe must have "inventory_only": true with ONLY fridge items + basic seasonings!
+- Remember: AT LEAST ONE recipe must have additional items that are not just seasonings or spices
+"""
+        
+        # Call Gemini API
+        gemini_response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=[{"role": "user", "parts": [{"text": prompt}]}],
+        )
+        
+        print("Gemini recipe response:")
+        print(gemini_response.text)
+        
+        # Parse the response
+        response_text = gemini_response.text.strip()
+        
+        # Remove markdown code fences if present
+        if response_text.startswith("```json"):
+            response_text = response_text.removeprefix("```json").removesuffix("```").strip()
+        elif response_text.startswith("```"):
+            response_text = response_text.removeprefix("```").removesuffix("```").strip()
+        
+        # Parse JSON
+        recipes = json.loads(response_text)
+        
+        return jsonify({"recipes": recipes})
+        
+    except json.JSONDecodeError as e:
+        print(f"JSON parsing error: {e}")
+        return jsonify({"error": "Failed to parse recipe data", "raw_response": gemini_response.text}), 500
+    except Exception as e:
+        print(f"Error generating recipes: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/calorie-tracker", methods=["GET", "POST"])
+def calorie_tracker():
+    """Track daily calorie consumption"""
+    if request.method == "GET":
+        # Return current calorie tracking data
+        # In a real app, this would come from a database with user authentication
+        # For now, we'll just return a success response and let frontend handle it
+        return jsonify({"status": "ok"})
+    
+    elif request.method == "POST":
+        # Log calorie consumption
+        data = request.get_json()
+        calories = data.get("calories", 0)
+        recipe_name = data.get("recipe_name", "Unknown")
+        
+        # In a real app, you'd save this to a database
+        # For this demo, we'll just log it
+        print(f"Logged consumption: {recipe_name} - {calories} calories")
+        
+        return jsonify({
+            "status": "success",
+            "message": f"Logged {calories} calories from {recipe_name}"
+        })
+
+>>>>>>> Stashed changes
 @app.route("/analyze", methods=["POST"])
 def analyze():
     prompt = f"""Analyze this food image and return the data as a Python dictionary. Follow these guidelines carefully:
