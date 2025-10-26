@@ -4,14 +4,12 @@ import os
 from dotenv import load_dotenv
 import requests
 import data
-<<<<<<< Updated upstream
 from datetime import datetime
 
 
 today_date = datetime.now().strftime("%d/%m/%Y")
-=======
 import json
->>>>>>> Stashed changes
+
 
 load_dotenv()
 
@@ -40,14 +38,13 @@ def fridge():
     return render_template("fridge.html")
 
 
-<<<<<<< Updated upstream
-=======
+
 @app.route("/recipes")
 def recipes_page():
     return render_template("recipes.html")
 
 
->>>>>>> Stashed changes
+
 @app.route("/api/fridge/<bin_id>")
 def get_fridge_data(bin_id):
     fridge_data = data.read_data_from_bin(bin_id)
@@ -73,71 +70,84 @@ def update_fridge_data(bin_id):
         return jsonify({"error": str(e)}), 500
 
 
-<<<<<<< Updated upstream
-=======
+
 @app.route("/api/generate-recipes", methods=["POST"])
 def generate_recipes():
     """Generate recipe recommendations based on inventory, prioritizing expiring items"""
     try:
         # Read inventory from bin
-        inventory_data = data.read_data_from_bin(TEST_BIN_ID)  # Change to BIN_ID for actual use
-        
+        inventory_data = data.read_data_from_bin(
+            TEST_BIN_ID
+        )  # Change to BIN_ID for actual use
+
         if not inventory_data or "inventory" not in inventory_data:
             return jsonify({"error": "No inventory found"}), 400
-        
+
         items = inventory_data["inventory"]
-        
+
         if not items:
             return jsonify({"error": "Inventory is empty"}), 400
-        
+
         # Sort by expiry date (earliest first)
         from datetime import datetime
-        
+
         def parse_date(item):
             try:
-                return datetime.strptime(item.get("expected_expiry_date", "31/12/2099"), "%d/%m/%Y")
+                return datetime.strptime(
+                    item.get("expected_expiry_date", "31/12/2099"), "%d/%m/%Y"
+                )
             except:
                 return datetime.max
-        
+
         sorted_items = sorted(items, key=parse_date)
-        
+
         # Analyze inventory diversity by type
         type_counts = {}
         for item in sorted_items:
-            item_type = item.get('type', 'other')
+            item_type = item.get("type", "other")
             type_counts[item_type] = type_counts.get(item_type, 0) + 1
-        
+
         available_types = list(type_counts.keys())
-        
+
         # Create a formatted inventory list for Gemini with nutritional info
-        inventory_text = "Current Inventory (sorted by expiry date - USE EARLIEST EXPIRING FIRST):\n"
+        inventory_text = (
+            "Current Inventory (sorted by expiry date - USE EARLIEST EXPIRING FIRST):\n"
+        )
         for i, item in enumerate(sorted_items, 1):
             days_until_expiry = "Unknown"
             try:
-                exp_date = datetime.strptime(item.get("expected_expiry_date", ""), "%d/%m/%Y")
+                exp_date = datetime.strptime(
+                    item.get("expected_expiry_date", ""), "%d/%m/%Y"
+                )
                 days = (exp_date - datetime.now()).days
-                days_until_expiry = f"{days} days" if days > 0 else "EXPIRED" if days < 0 else "TODAY"
+                days_until_expiry = (
+                    f"{days} days" if days > 0 else "EXPIRED" if days < 0 else "TODAY"
+                )
             except:
                 pass
-            
+
             inventory_text += f"{i}. {item.get('name', 'Unknown').upper()} ({item.get('type', 'food')})\n"
             inventory_text += f"   - Quantity: {item.get('quantity', 'N/A')} units\n"
             inventory_text += f"   - Expires: {item.get('expected_expiry_date', 'Unknown')} ({days_until_expiry})\n"
-            inventory_text += f"   - Nutrition (per unit): {item.get('calories', 0)} cal, "
-            inventory_text += f"{item.get('protein', 0)}g protein, {item.get('carbs', 0)}g carbs, "
+            inventory_text += (
+                f"   - Nutrition (per unit): {item.get('calories', 0)} cal, "
+            )
+            inventory_text += (
+                f"{item.get('protein', 0)}g protein, {item.get('carbs', 0)}g carbs, "
+            )
             inventory_text += f"{item.get('fats', 0)}g fats\n"
-        
+
         # Get user preferences if provided
         request_data = request.get_json() or {}
         dietary_restrictions = request_data.get("dietary_restrictions", "")
         cuisine_preference = request_data.get("cuisine_preference", "")
         num_recipes = request_data.get("num_recipes", 3)
         target_calories_per_meal = request_data.get("target_calories_per_meal", 500)
-        
+
         # Build the prompt with nutritional and diversity requirements
         prompt = f"""{inventory_text}
 
-Available food types in inventory: {', '.join(available_types)}
+Available food types in inventory: {", ".join(available_types)}
 
 TARGET CALORIES PER MEAL: ~{target_calories_per_meal} calories (user's remaining daily budget divided by meals left)
 
@@ -158,7 +168,7 @@ Generate {num_recipes} diverse and nutritionally balanced recipe recommendations
 
 🥗 DIVERSITY REQUIREMENTS:
 1. Each recipe MUST use ingredients from AT LEAST 2-3 different food types (e.g., protein + vegetable + grain)
-2. Across all {num_recipes} recipes, try to use items from ALL available types: {', '.join(available_types)}
+2. Across all {num_recipes} recipes, try to use items from ALL available types: {", ".join(available_types)}
 3. Don't create recipes using only one food type (e.g., not just fruits or just vegetables)
 4. Balance macronutrients: aim for recipes with protein, carbs, and healthy fats
 
@@ -224,33 +234,42 @@ IMPORTANT:
 - Remember: AT LEAST ONE recipe must have "inventory_only": true with ONLY fridge items + basic seasonings!
 - Remember: AT LEAST ONE recipe must have additional items that are not just seasonings or spices
 """
-        
+
         # Call Gemini API
         gemini_response = client.models.generate_content(
             model="gemini-2.0-flash",
             contents=[{"role": "user", "parts": [{"text": prompt}]}],
         )
-        
+
         print("Gemini recipe response:")
         print(gemini_response.text)
-        
+
         # Parse the response
         response_text = gemini_response.text.strip()
-        
+
         # Remove markdown code fences if present
         if response_text.startswith("```json"):
-            response_text = response_text.removeprefix("```json").removesuffix("```").strip()
+            response_text = (
+                response_text.removeprefix("```json").removesuffix("```").strip()
+            )
         elif response_text.startswith("```"):
-            response_text = response_text.removeprefix("```").removesuffix("```").strip()
-        
+            response_text = (
+                response_text.removeprefix("```").removesuffix("```").strip()
+            )
+
         # Parse JSON
         recipes = json.loads(response_text)
-        
+
         return jsonify({"recipes": recipes})
-        
+
     except json.JSONDecodeError as e:
         print(f"JSON parsing error: {e}")
-        return jsonify({"error": "Failed to parse recipe data", "raw_response": gemini_response.text}), 500
+        return jsonify(
+            {
+                "error": "Failed to parse recipe data",
+                "raw_response": gemini_response.text,
+            }
+        ), 500
     except Exception as e:
         print(f"Error generating recipes: {e}")
         return jsonify({"error": str(e)}), 500
@@ -264,23 +283,25 @@ def calorie_tracker():
         # In a real app, this would come from a database with user authentication
         # For now, we'll just return a success response and let frontend handle it
         return jsonify({"status": "ok"})
-    
+
     elif request.method == "POST":
         # Log calorie consumption
         data = request.get_json()
         calories = data.get("calories", 0)
         recipe_name = data.get("recipe_name", "Unknown")
-        
+
         # In a real app, you'd save this to a database
         # For this demo, we'll just log it
         print(f"Logged consumption: {recipe_name} - {calories} calories")
-        
-        return jsonify({
-            "status": "success",
-            "message": f"Logged {calories} calories from {recipe_name}"
-        })
 
->>>>>>> Stashed changes
+        return jsonify(
+            {
+                "status": "success",
+                "message": f"Logged {calories} calories from {recipe_name}",
+            }
+        )
+
+
 @app.route("/analyze", methods=["POST"])
 def analyze():
     prompt = f"""Analyze this food image and return the data as a Python dictionary. Follow these guidelines carefully:
