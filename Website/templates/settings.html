@@ -31,11 +31,13 @@
       justify-content: between;
       align-items: center;
       margin-bottom: 0.5rem;
+      gap: 1rem;
     }
     
     .setting-label span {
       font-weight: 600;
       color: var(--text-primary);
+      flex: 1;
     }
     
     .setting-description {
@@ -49,6 +51,8 @@
       display: inline-block;
       width: 50px;
       height: 24px;
+      flex-shrink: 0;
+      margin-left: auto;
     }
     
     .toggle-switch input {
