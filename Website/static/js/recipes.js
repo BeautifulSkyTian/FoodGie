@@ -6,8 +6,18 @@ class RecipeManager {
     this.emptyState = document.getElementById("empty-state");
     this.calorieTracker = window.calorieTracker;
 
+    // Wait for calorie tracker to be ready
+    if (!this.calorieTracker) {
+      console.warn('Calorie tracker not immediately available, waiting...');
+      setTimeout(() => {
+        this.calorieTracker = window.calorieTracker;
+        this.displayCalorieSummary();
+      }, 100);
+    } else {
+      this.displayCalorieSummary();
+    }
+
     this.initEventListeners();
-    this.displayCalorieSummary();
   }
 
   initEventListeners() {
@@ -15,13 +25,25 @@ class RecipeManager {
   }
 
   displayCalorieSummary() {
-    if (!this.calorieTracker) return;
+    // Remove existing banner if present
+    const existingBanner = document.querySelector('.calorie-summary-banner');
+    if (existingBanner) {
+      existingBanner.remove();
+    }
+
+    if (!this.calorieTracker) {
+      console.warn('Calorie tracker not available for summary display');
+      return;
+    }
 
     const summary = this.calorieTracker.getSummary();
     const settings = JSON.parse(localStorage.getItem('foogie-settings') || '{}');
     
     // Only show if user has enabled calorie progress
-    if (settings.showCalorieProgress === false) return;
+    if (settings.showCalorieProgress === false) {
+      console.log('Calorie progress display disabled in settings');
+      return;
+    }
 
     const summaryDiv = document.createElement("div");
     summaryDiv.className = "calorie-summary-banner";
@@ -37,7 +59,7 @@ class RecipeManager {
         </div>
         <div class="calorie-stat highlight">
           <span class="stat-label">Remaining</span>
-          <span class="stat-value">${summary.remaining} cal</span>
+          <span class="stat-value ${summary.isOverGoal ? 'over-goal' : ''}">${summary.remaining} cal</span>
         </div>
         <div class="calorie-stat">
           <span class="stat-label">Per Meal (${summary.mealsLeft} left)</span>
@@ -51,7 +73,10 @@ class RecipeManager {
 
     // Insert before the main card
     const mainCard = document.querySelector("main .card");
-    mainCard.parentNode.insertBefore(summaryDiv, mainCard);
+    if (mainCard) {
+      mainCard.parentNode.insertBefore(summaryDiv, mainCard);
+      console.log('Calorie summary banner displayed:', summary);
+    }
   }
 
   async handleSubmit(e) {
@@ -59,9 +84,16 @@ class RecipeManager {
 
     const formData = new FormData(this.form);
     
-    // Get target calories per meal
-    const targetCaloriesPerMeal = this.calorieTracker ? 
-      this.calorieTracker.getCaloriesPerMeal() : 500;
+    // Get target calories per meal - ensure we're using the tracker correctly
+    let targetCaloriesPerMeal = 500; // Default fallback
+    
+    if (this.calorieTracker) {
+      const summary = this.calorieTracker.getSummary();
+      targetCaloriesPerMeal = summary.caloriesPerMeal || 500;
+      console.log('Using target calories per meal:', targetCaloriesPerMeal, 'from summary:', summary);
+    } else {
+      console.warn('Calorie tracker not available, using default target calories');
+    }
 
     const requestData = {
       num_recipes: parseInt(formData.get("num_recipes")),
@@ -69,6 +101,8 @@ class RecipeManager {
       cuisine_preference: formData.get("cuisine_preference").trim(),
       target_calories_per_meal: targetCaloriesPerMeal
     };
+
+    console.log('Sending recipe request:', requestData);
 
     this.showLoading();
 
@@ -138,6 +172,8 @@ class RecipeManager {
     // Calculate if this fits in remaining calories
     const remaining = this.calorieTracker ? this.calorieTracker.getRemainingCalories() : null;
     const fitsInBudget = remaining === null || totalCalories <= remaining;
+
+    console.log(`Recipe "${recipe.name}": ${totalCalories} cal, Remaining: ${remaining}, Fits: ${fitsInBudget}`);
 
     div.innerHTML = `
       <div class="recipe-header">
@@ -283,46 +319,61 @@ class RecipeManager {
   async handleUseRecipe(recipe, totalCalories, cardElement) {
     if (!this.calorieTracker) {
       alert('Calorie tracking is not available');
+      console.error('Calorie tracker not available when trying to log meal');
       return;
     }
 
     const nutrition = recipe.nutrition_per_serving || {};
     const servings = recipe.servings || 1;
 
-    // Log the meal
-    await this.calorieTracker.logMeal(recipe.name, totalCalories, {
-      protein: (nutrition.protein || 0) * servings,
-      carbs: (nutrition.carbs || 0) * servings,
-      fats: (nutrition.fats || 0) * servings,
-      servings: servings
+    console.log('Logging meal:', {
+      name: recipe.name,
+      totalCalories,
+      nutrition: {
+        protein: (nutrition.protein || 0) * servings,
+        carbs: (nutrition.carbs || 0) * servings,
+        fats: (nutrition.fats || 0) * servings,
+        servings
+      }
     });
 
-    // Update the card to show it's been used
-    cardElement.classList.add('recipe-used');
-    const useBtn = cardElement.querySelector('.use-recipe-btn');
-    useBtn.innerHTML = '<span>✅</span> Logged!';
-    useBtn.disabled = true;
+    // Log the meal
+    try {
+      await this.calorieTracker.logMeal(recipe.name, totalCalories, {
+        protein: (nutrition.protein || 0) * servings,
+        carbs: (nutrition.carbs || 0) * servings,
+        fats: (nutrition.fats || 0) * servings,
+        servings: servings
+      });
 
-    // Show success message
-    const summary = this.calorieTracker.getSummary();
-    const message = document.createElement('div');
-    message.className = 'result success';
-    message.style.marginTop = '1rem';
-    message.innerHTML = `
-      <p><strong>Meal logged!</strong></p>
-      <p>Remaining today: ${summary.remaining} calories (${summary.mealsLeft} meals left = ~${summary.caloriesPerMeal} cal/meal)</p>
-    `;
-    cardElement.appendChild(message);
+      // Update the card to show it's been used
+      cardElement.classList.add('recipe-used');
+      const useBtn = cardElement.querySelector('.use-recipe-btn');
+      useBtn.innerHTML = '<span>✅</span> Logged!';
+      useBtn.disabled = true;
 
-    // Refresh the calorie summary banner
-    const existingBanner = document.querySelector('.calorie-summary-banner');
-    if (existingBanner) {
-      existingBanner.remove();
+      // Show success message
+      const summary = this.calorieTracker.getSummary();
+      const message = document.createElement('div');
+      message.className = 'result success';
+      message.style.marginTop = '1rem';
+      message.innerHTML = `
+        <p><strong>Meal logged successfully!</strong></p>
+        <p>Remaining today: ${summary.remaining} calories (${summary.mealsLeft} meals left = ~${summary.caloriesPerMeal} cal/meal)</p>
+      `;
+      cardElement.appendChild(message);
+
+      console.log('Meal logged successfully. New summary:', summary);
+
+      // Refresh the calorie summary banner
       this.displayCalorieSummary();
-    }
 
-    // Scroll to top to see updated summary
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+      // Scroll to top to see updated summary
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (error) {
+      console.error('Error logging meal:', error);
+      alert('Failed to log meal. Please try again.');
+    }
   }
 
   escapeHtml(text) {
@@ -349,4 +400,7 @@ class RecipeManager {
 }
 
 // Initialize when DOM is ready
-const recipeManager = new RecipeManager();
+document.addEventListener('DOMContentLoaded', () => {
+  console.log('DOM loaded, initializing recipe manager');
+  window.recipeManager = new RecipeManager();
+});

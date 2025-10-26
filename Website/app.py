@@ -109,7 +109,7 @@ def generate_recipes():
 
         available_types = list(type_counts.keys())
 
-        # Create a formatted inventory list for Gemini with nutritional info
+        # Create a formatted inventory list for Gemini with CORRECTED nutritional info
         inventory_text = (
             "Current Inventory (sorted by expiry date - USE EARLIEST EXPIRING FIRST):\n"
         )
@@ -126,16 +126,28 @@ def generate_recipes():
             except:
                 pass
 
+            # Get unit and quantity for calculations
+            unit = item.get('unit', 'units')
+            quantity = item.get('quantity', 1)
+            
+            # CRITICAL: Calculate per-unit nutrition
+            # The stored values are TOTAL for all items, so divide by quantity
+            total_calories = item.get('calories', 0)
+            total_protein = item.get('protein', 0)
+            total_carbs = item.get('carbs', 0)
+            total_fats = item.get('fats', 0)
+            
+            # Calculate per-unit values
+            calories_per_unit = round(total_calories / quantity) if quantity > 0 else 0
+            protein_per_unit = round(total_protein / quantity) if quantity > 0 else 0
+            carbs_per_unit = round(total_carbs / quantity) if quantity > 0 else 0
+            fats_per_unit = round(total_fats / quantity) if quantity > 0 else 0
+            
             inventory_text += f"{i}. {item.get('name', 'Unknown').upper()} ({item.get('type', 'food')})\n"
-            inventory_text += f"   - Quantity: {item.get('quantity', 'N/A')} units\n"
+            inventory_text += f"   - Available quantity: {quantity} {unit}\n"
             inventory_text += f"   - Expires: {item.get('expected_expiry_date', 'Unknown')} ({days_until_expiry})\n"
-            inventory_text += (
-                f"   - Nutrition (per unit): {item.get('calories', 0)} cal, "
-            )
-            inventory_text += (
-                f"{item.get('protein', 0)}g protein, {item.get('carbs', 0)}g carbs, "
-            )
-            inventory_text += f"{item.get('fats', 0)}g fats\n"
+            inventory_text += f"   - TOTAL nutrition (for all {quantity} {unit}): {total_calories} cal, {total_protein}g protein, {total_carbs}g carbs, {total_fats}g fats\n"
+            inventory_text += f"   - PER-UNIT nutrition (per 1 {unit.rstrip('s')}): {calories_per_unit} cal, {protein_per_unit}g protein, {carbs_per_unit}g carbs, {fats_per_unit}g fats\n"
 
         # Get user preferences if provided
         request_data = request.get_json() or {}
@@ -172,55 +184,74 @@ Generate {num_recipes} diverse and nutritionally balanced recipe recommendations
 3. Don't create recipes using only one food type (e.g., not just fruits or just vegetables)
 4. Balance macronutrients: aim for recipes with protein, carbs, and healthy fats
 
-📊 NUTRITIONAL REQUIREMENTS:
-1. Calculate accurate total nutrition by SUMMING the nutritional values of inventory items used
-2. For each inventory item used, multiply its nutrition by the quantity used
-3. Add estimated nutrition for additional ingredients (pantry staples)
-4. **TARGET: Aim for recipes around {target_calories_per_meal} calories per serving** (this is based on user's remaining daily calorie budget)
-5. Each recipe should aim for balanced macros:
+📊 CRITICAL NUTRITIONAL CALCULATION RULES:
+**READ THIS CAREFULLY - THIS IS THE MOST IMPORTANT PART:**
+
+1. Each inventory item shows TWO nutrition values:
+   - TOTAL nutrition = for ALL units in inventory (e.g., 637 cal for 7 bananas)
+   - PER-UNIT nutrition = for ONE unit (e.g., 91 cal per 1 banana)
+
+2. **YOU MUST USE THE PER-UNIT VALUES IN YOUR CALCULATIONS!**
+   - If using 2 bananas: 2 × 91 cal = 182 cal (NOT 2 × 637 = 1274 cal!)
+   - If using 200 grams of chicken (per-unit is per 100g): 2 × per-unit value
+
+3. **CALCULATION FORMULA:**
+   ```
+   Recipe Nutrition = Σ(quantity_used × per_unit_nutrition) + additional_ingredients_nutrition
+   ```
+
+4. **EXAMPLE CALCULATION:**
+   - Recipe uses: 3 bananas + 1 cup yogurt (150 cal)
+   - Banana per-unit: 91 cal, 0g protein, 23g carbs, 0g fats
+   - Calculation: (3 × 91) + 150 = 273 + 150 = 423 total calories
+   - Final: 423 cal, 3g protein, 69g carbs, 0g fats
+
+5. **TARGET: Aim for recipes around {target_calories_per_meal} calories per serving**
+
+6. Each recipe should aim for balanced macros:
    - Protein: 15-30g per serving
    - Carbs: 30-60g per serving
    - Fats: 10-25g per serving
-6. In the recipe, show nutritional breakdown clearly
 
 🍳 RECIPE REQUIREMENTS:
 - Use realistic quantities from inventory (don't use more than available)
-- Provide clear measurements (e.g., "2 apples from inventory" or "200g ground beef from inventory")
+- **CRITICAL: ALWAYS include the unit when specifying quantities** (e.g., "2 items of apples" or "200 grams of chicken")
+- When listing inventory items used, show the nutrition calculation clearly
 - Instructions should be 4-8 detailed steps
 - Cooking time should be realistic (15-60 minutes)
 
 {f"⚠️ DIETARY RESTRICTIONS: {dietary_restrictions} - STRICTLY follow these restrictions!" if dietary_restrictions else ""}
-{f"🌍 CUISINE PREFERENCE: {cuisine_preference} - Try to match this style" if cuisine_preference else ""}
+{f"🌎 CUISINE PREFERENCE: {cuisine_preference} - Try to match this style" if cuisine_preference else ""}
 
-Format your response as a JSON array. Each recipe must include nutritional breakdown:
+Format your response as a JSON array. Each recipe must include accurate nutritional calculations using PER-UNIT values:
 
 [
   {{
     "name": "Recipe Name",
     "inventory_only": false,
     "inventory_items_used": [
-      "2 apples (190 cal, 0g protein, 50g carbs, 0g fats)",
-      "200g ground beef (250 cal, 50g protein, 0g carbs, 17g fats)"
+      "2 items of banana (182 cal from 2 × 91 cal per item, 0g protein, 46g carbs, 0g fats)",
+      "200 grams of chicken (220 cal from 2 × 110 cal per 100g, 44g protein, 0g carbs, 4g fats)"
     ],
-    "additional_ingredients": ["1 onion (40 cal)", "2 cloves garlic (10 cal)", "salt", "pepper", "olive oil (120 cal)"],
+    "additional_ingredients": ["1 cup yogurt (150 cal, 10g protein, 20g carbs, 2g fats)", "salt", "pepper"],
     "instructions": ["Step 1...", "Step 2...", "Step 3...", "Step 4..."],
     "cooking_time": "30 minutes",
     "servings": 2,
     "nutrition_per_serving": {{
-      "calories": 305,
-      "protein": 25,
-      "carbs": 25,
-      "fats": 12
+      "calories": 276,
+      "protein": 27,
+      "carbs": 33,
+      "fats": 3
     }},
     "total_nutrition": {{
-      "calories": 610,
-      "protein": 50,
-      "carbs": 50,
-      "fats": 24
+      "calories": 552,
+      "protein": 54,
+      "carbs": 66,
+      "fats": 6
     }},
-    "food_types_used": ["protein", "fruit", "vegetable"],
+    "food_types_used": ["protein", "fruit", "dairy"],
     "urgency": "high",
-    "urgency_reason": "Uses apples expiring in 2 days"
+    "urgency_reason": "Uses bananas expiring in 6 days"
   }}
 ]
 
@@ -229,10 +260,13 @@ URGENCY LEVELS:
 - "medium" = uses items expiring within 7 days  
 - "low" = uses items expiring after 7 days
 
-IMPORTANT: 
-- Make sure nutritional calculations are accurate by adding up all ingredient values!
-- Remember: AT LEAST ONE recipe must have "inventory_only": true with ONLY fridge items + basic seasonings!
-- Remember: AT LEAST ONE recipe must have additional items that are not just seasonings or spices
+⚠️ CRITICAL REMINDERS:
+1. **USE PER-UNIT NUTRITION VALUES, NOT TOTAL VALUES!**
+2. Show your calculation in the inventory_items_used list (e.g., "2 × 91 cal per item")
+3. Always include units (items, grams, containers, eggs)
+4. Double-check that your total nutrition makes sense for the quantity used
+5. AT LEAST ONE recipe must have "inventory_only": true
+6. AT LEAST ONE recipe must have additional items beyond seasonings
 """
 
         # Call Gemini API
@@ -279,19 +313,13 @@ IMPORTANT:
 def calorie_tracker():
     """Track daily calorie consumption"""
     if request.method == "GET":
-        # Return current calorie tracking data
-        # In a real app, this would come from a database with user authentication
-        # For now, we'll just return a success response and let frontend handle it
         return jsonify({"status": "ok"})
 
     elif request.method == "POST":
-        # Log calorie consumption
         data = request.get_json()
         calories = data.get("calories", 0)
         recipe_name = data.get("recipe_name", "Unknown")
 
-        # In a real app, you'd save this to a database
-        # For this demo, we'll just log it
         print(f"Logged consumption: {recipe_name} - {calories} calories")
 
         return jsonify(
