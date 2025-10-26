@@ -69,7 +69,42 @@ def update_fridge_data(bin_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-
+@app.route("/api/consume/<bin_id>", methods=["POST"])
+def consume_items(bin_id):
+    """
+    Consume items from inventory when a recipe is made.
+    Expects JSON: {"consumed": {"apple": 2, "chicken": 200}}
+    """
+    try:
+        consumed_data = request.get_json()
+        
+        if not consumed_data or "consumed" not in consumed_data:
+            return jsonify({"error": "No consumption data provided"}), 400
+        
+        consumed_map = consumed_data["consumed"]
+        
+        if not consumed_map:
+            return jsonify({"error": "Empty consumption map"}), 400
+        
+        print(f"Processing consumption for bin {bin_id}: {consumed_map}")
+        
+        # Use the data.py consume function
+        data.consume_data_from_bin(bin_id, consumed_map)
+        
+        # Return the updated inventory
+        updated_data = data.read_data_from_bin(bin_id)
+        
+        return jsonify({
+            "success": True,
+            "message": "Items consumed successfully",
+            "inventory": updated_data
+        })
+        
+    except Exception as e:
+        print(f"Error consuming items: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/api/generate-recipes", methods=["POST"])
 def generate_recipes():

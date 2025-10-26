@@ -5,6 +5,7 @@ class RecipeManager {
     this.loadingState = document.getElementById("loading");
     this.emptyState = document.getElementById("empty-state");
     this.calorieTracker = window.calorieTracker;
+    this.BIN_ID = "68fd3d3c43b1c97be980b98b"; // TEST_BIN_ID - change to production as needed
 
     // Wait for calorie tracker to be ready
     if (!this.calorieTracker) {
@@ -39,7 +40,6 @@ class RecipeManager {
     const summary = this.calorieTracker.getSummary();
     const settings = JSON.parse(localStorage.getItem('foogie-settings') || '{}');
     
-    // Only show if user has enabled calorie progress
     if (settings.showCalorieProgress === false) {
       console.log('Calorie progress display disabled in settings');
       return;
@@ -71,7 +71,6 @@ class RecipeManager {
       </div>
     `;
 
-    // Insert before the main card
     const mainCard = document.querySelector("main .card");
     if (mainCard) {
       mainCard.parentNode.insertBefore(summaryDiv, mainCard);
@@ -84,15 +83,12 @@ class RecipeManager {
 
     const formData = new FormData(this.form);
     
-    // Get target calories per meal - ensure we're using the tracker correctly
-    let targetCaloriesPerMeal = 500; // Default fallback
+    let targetCaloriesPerMeal = 500;
     
     if (this.calorieTracker) {
       const summary = this.calorieTracker.getSummary();
       targetCaloriesPerMeal = summary.caloriesPerMeal || 500;
-      console.log('Using target calories per meal:', targetCaloriesPerMeal, 'from summary:', summary);
-    } else {
-      console.warn('Calorie tracker not available, using default target calories');
+      console.log('Using target calories per meal:', targetCaloriesPerMeal);
     }
 
     const requestData = {
@@ -101,8 +97,6 @@ class RecipeManager {
       cuisine_preference: formData.get("cuisine_preference").trim(),
       target_calories_per_meal: targetCaloriesPerMeal
     };
-
-    console.log('Sending recipe request:', requestData);
 
     this.showLoading();
 
@@ -142,6 +136,62 @@ class RecipeManager {
     }
   }
 
+  /**
+   * Parse inventory items from the recipe to extract item names and quantities
+   * Example input: "2 items of banana (182 cal from 2 × 91 cal per item, 0g protein, 46g carbs, 0g fats)"
+   * Returns: {name: "banana", quantity: 2, unit: "items"}
+   */
+  parseInventoryItem(itemString) {
+    // Try to match pattern: "X unit of name (nutrition...)"
+    const match = itemString.match(/^(\d+(?:\.\d+)?)\s+(items|grams|containers|eggs)\s+of\s+([a-zA-Z\s]+)/i);
+    
+    if (match) {
+      return {
+        name: match[3].trim().toLowerCase(),
+        quantity: parseFloat(match[1]),
+        unit: match[2].toLowerCase()
+      };
+    }
+    
+    // Fallback: try to extract just quantity and name
+    const simpleMatch = itemString.match(/^(\d+(?:\.\d+)?)\s+([a-zA-Z\s]+)/i);
+    if (simpleMatch) {
+      return {
+        name: simpleMatch[2].trim().toLowerCase(),
+        quantity: parseFloat(simpleMatch[1]),
+        unit: 'items' // default
+      };
+    }
+    
+    console.warn('Could not parse inventory item:', itemString);
+    return null;
+  }
+
+  /**
+   * Extract consumption data from recipe
+   */
+  extractConsumptionData(recipe) {
+    const consumedMap = {};
+    const inventoryItems = recipe.inventory_items_used || [];
+    
+    inventoryItems.forEach(itemString => {
+      const parsed = this.parseInventoryItem(itemString);
+      if (parsed) {
+        // Use the food name as key
+        const key = parsed.name;
+        
+        // If already exists, add to it
+        if (consumedMap[key]) {
+          consumedMap[key] += parsed.quantity;
+        } else {
+          consumedMap[key] = parsed.quantity;
+        }
+      }
+    });
+    
+    return consumedMap;
+  }
+
   renderRecipes(recipes) {
     this.hideLoading();
     this.emptyState.classList.add("hidden");
@@ -152,7 +202,6 @@ class RecipeManager {
       this.recipesContainer.appendChild(recipeCard);
     });
 
-    // Smooth scroll to recipes
     this.recipesContainer.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
@@ -160,8 +209,8 @@ class RecipeManager {
     const div = document.createElement("div");
     const urgency = recipe.urgency || "low";
     div.className = `recipe-card urgency-${urgency}`;
+    div.dataset.recipeData = JSON.stringify(recipe); // Store recipe data
 
-    // Format inventory items
     const inventoryItems = recipe.inventory_items_used || [];
     const additionalItems = recipe.additional_ingredients || [];
     const foodTypes = recipe.food_types_used || [];
@@ -169,11 +218,8 @@ class RecipeManager {
     const servings = recipe.servings || 1;
     const totalCalories = (nutrition.calories || 0) * servings;
 
-    // Calculate if this fits in remaining calories
     const remaining = this.calorieTracker ? this.calorieTracker.getRemainingCalories() : null;
     const fitsInBudget = remaining === null || totalCalories <= remaining;
-
-    console.log(`Recipe "${recipe.name}": ${totalCalories} cal, Remaining: ${remaining}, Fits: ${fitsInBudget}`);
 
     div.innerHTML = `
       <div class="recipe-header">
@@ -304,12 +350,11 @@ class RecipeManager {
 
       <div class="recipe-actions">
         <button class="btn btn-primary use-recipe-btn" data-recipe-index="${index}">
-          <span>✅</span> I Made This! (Log ${totalCalories} cal)
+          <span>✅</span> I Made This! (Log ${totalCalories} cal & Update Fridge)
         </button>
       </div>
     `;
 
-    // Add event listener to the use button
     const useBtn = div.querySelector('.use-recipe-btn');
     useBtn.addEventListener('click', () => this.handleUseRecipe(recipe, totalCalories, div));
 
@@ -319,26 +364,47 @@ class RecipeManager {
   async handleUseRecipe(recipe, totalCalories, cardElement) {
     if (!this.calorieTracker) {
       alert('Calorie tracking is not available');
-      console.error('Calorie tracker not available when trying to log meal');
       return;
     }
 
     const nutrition = recipe.nutrition_per_serving || {};
     const servings = recipe.servings || 1;
 
-    console.log('Logging meal:', {
-      name: recipe.name,
-      totalCalories,
-      nutrition: {
-        protein: (nutrition.protein || 0) * servings,
-        carbs: (nutrition.carbs || 0) * servings,
-        fats: (nutrition.fats || 0) * servings,
-        servings
-      }
-    });
+    // Extract consumption data
+    const consumedMap = this.extractConsumptionData(recipe);
+    console.log('Extracted consumption data:', consumedMap);
 
-    // Log the meal
+    if (Object.keys(consumedMap).length === 0) {
+      console.warn('No inventory items to consume');
+    }
+
     try {
+      // Show loading state
+      const useBtn = cardElement.querySelector('.use-recipe-btn');
+      useBtn.innerHTML = '<span>⏳</span> Processing...';
+      useBtn.disabled = true;
+
+      // 1. Consume items from fridge
+      if (Object.keys(consumedMap).length > 0) {
+        console.log('Consuming items from fridge:', consumedMap);
+        const consumeResponse = await fetch(`/api/consume/${this.BIN_ID}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ consumed: consumedMap })
+        });
+
+        if (!consumeResponse.ok) {
+          const errorData = await consumeResponse.json();
+          throw new Error(`Failed to update fridge: ${errorData.error || 'Unknown error'}`);
+        }
+
+        const consumeData = await consumeResponse.json();
+        console.log('Fridge updated successfully:', consumeData);
+      }
+
+      // 2. Log the meal to calorie tracker
       await this.calorieTracker.logMeal(recipe.name, totalCalories, {
         protein: (nutrition.protein || 0) * servings,
         carbs: (nutrition.carbs || 0) * servings,
@@ -346,33 +412,41 @@ class RecipeManager {
         servings: servings
       });
 
-      // Update the card to show it's been used
+      // 3. Update the card to show it's been used
       cardElement.classList.add('recipe-used');
-      const useBtn = cardElement.querySelector('.use-recipe-btn');
-      useBtn.innerHTML = '<span>✅</span> Logged!';
+      useBtn.innerHTML = '<span>✅</span> Logged & Fridge Updated!';
       useBtn.disabled = true;
 
-      // Show success message
+      // 4. Show success message
       const summary = this.calorieTracker.getSummary();
       const message = document.createElement('div');
       message.className = 'result success';
       message.style.marginTop = '1rem';
       message.innerHTML = `
-        <p><strong>Meal logged successfully!</strong></p>
-        <p>Remaining today: ${summary.remaining} calories (${summary.mealsLeft} meals left = ~${summary.caloriesPerMeal} cal/meal)</p>
+        <p><strong>✅ Success!</strong></p>
+        <p>🍽️ Meal logged: ${totalCalories} calories</p>
+        <p>🗄️ Fridge updated: ${Object.entries(consumedMap).map(([name, qty]) => `${qty} ${name}`).join(', ')} removed</p>
+        <p>📊 Remaining today: ${summary.remaining} cal (${summary.mealsLeft} meals left = ~${summary.caloriesPerMeal} cal/meal)</p>
       `;
       cardElement.appendChild(message);
 
-      console.log('Meal logged successfully. New summary:', summary);
+      console.log('Recipe completed successfully. Summary:', summary);
 
-      // Refresh the calorie summary banner
+      // 5. Refresh the calorie summary banner
       this.displayCalorieSummary();
 
-      // Scroll to top to see updated summary
+      // 6. Scroll to top
       window.scrollTo({ top: 0, behavior: 'smooth' });
+
     } catch (error) {
-      console.error('Error logging meal:', error);
-      alert('Failed to log meal. Please try again.');
+      console.error('Error processing recipe:', error);
+      
+      // Reset button on error
+      const useBtn = cardElement.querySelector('.use-recipe-btn');
+      useBtn.innerHTML = '<span>❌</span> Error - Try Again';
+      useBtn.disabled = false;
+      
+      alert(`Failed to process recipe: ${error.message}\n\nPlease try again or check the console for details.`);
     }
   }
 
