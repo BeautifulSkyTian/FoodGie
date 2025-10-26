@@ -361,6 +361,31 @@
     let allItems = [];
     let currentFilter = 'all';
 
+    // Delete item function - MUST be global for onclick to work
+    window.deleteItem = async function(index) {
+      if (!confirm('Are you sure you want to remove this item from view?')) {
+        return;
+      }
+      
+      try {
+        // Remove item from local array (only affects display)
+        allItems.splice(index, 1);
+        
+        // Update the display
+        updateSummary();
+        renderFridge(currentFilter);
+        
+        // Show empty state if no items left
+        if (allItems.length === 0) {
+          document.getElementById('fridge-grid').style.display = 'none';
+          document.getElementById('empty-state').style.display = 'block';
+        }
+      } catch (error) {
+        console.error('Error removing item from view:', error);
+        alert('Failed to remove item. Please try again.');
+      }
+    };
+
     // Food type to emoji mapping
     const foodEmojis = {
       'fruit': '🍎',
@@ -412,7 +437,7 @@
           <div class="food-stats">
             <div class="stat-item">
               <div class="stat-label">Quantity</div>
-              <div class="stat-value">${item.quantity}</div>
+              <div class="stat-value">${item.quantity} ${item.unit || ''}</div>
             </div>
             <div class="stat-item">
               <div class="stat-label">Calories</div>
@@ -443,7 +468,8 @@
     }
 
     function updateSummary() {
-      const totalItems = allItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
+      // Count distinct items (number of different food entries)
+      const totalItems = allItems.length;
       const totalCalories = allItems.reduce((sum, item) => sum + (item.calories || 0), 0);
       const expiringCount = allItems.filter(item => {
         const days = getDaysUntilExpiry(item.expected_expiry_date);
@@ -536,46 +562,6 @@
 
     // Load data on page load
     loadFridgeData();
-    
-    // Delete item function
-    async function deleteItem(index) {
-      if (!confirm('Are you sure you want to remove this item from your fridge?')) {
-        return;
-      }
-      
-      try {
-        // Remove item from local array
-        allItems.splice(index, 1);
-        
-        // Update the display
-        updateSummary();
-        renderFridge(currentFilter);
-        
-        // Update the backend
-        const response = await fetch(`/api/fridge/${TEST_BIN_ID}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ inventory: allItems })
-        });
-        
-        if (!response.ok) {
-          throw new Error('Failed to update fridge data');
-        }
-        
-        // Show empty state if no items left
-        if (allItems.length === 0) {
-          document.getElementById('fridge-grid').style.display = 'none';
-          document.getElementById('empty-state').style.display = 'block';
-        }
-      } catch (error) {
-        console.error('Error deleting item:', error);
-        alert('Failed to delete item. Please try again.');
-        // Reload data to restore correct state
-        loadFridgeData();
-      }
-    }
   </script>
 </body>
 </html>
